@@ -1,0 +1,55 @@
+{
+  "name": "mppx-token-gate",
+  "version": "1.0.0",
+  "description": "Token-gate mppx routes using signed wallet attestations — 32 chains, no RPC management",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "src"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "prepublishOnly": "npm run build"
+  },
+  "keywords": [
+    "mppx",
+    "mpp",
+    "token-gate",
+    "token-gating",
+    "wallet",
+    "attestation",
+    "erc20",
+    "erc721",
+    "nft",
+    "solana",
+    "xrpl",
+    "web3"
+  ],
+  "author": "douglasborthwick-crypto",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/douglasborthwick-crypto/mppx-token-gate.git"
+  },
+  "peerDependencies": {
+    "mppx": ">=0.1.0"
+  },
+  "peerDependenciesMeta": {
+    "mppx": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@types/node": "^25.5.0",
+    "mppx": "latest",
+    "typescript": "^5.7.0"
+  }
+}
