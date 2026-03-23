@@ -1,4 +1,4 @@
-# mppx-token-gate
+# @insumermodel/mppx-token-gate
 
 Token-gate [mppx](https://github.com/wevm/mppx) routes using signed wallet attestations. One API call checks token/NFT ownership across 30 EVM chains + Solana + XRPL — no RPC management, no viem transports, no in-house balance checks.
 
@@ -17,14 +17,14 @@ The attestation signature is verifiable offline via [JWKS](https://insumermodel.
 ## Install
 
 ```bash
-npm install mppx-token-gate
+npm install @insumermodel/mppx-token-gate
 ```
 
 ## Usage
 
 ```ts
 import { Mppx, tempo } from 'mppx/server'
-import { tokenGate } from 'mppx-token-gate'
+import { tokenGate } from '@insumermodel/mppx-token-gate'
 
 const tempoCharge = tempo({
   currency: '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913',
