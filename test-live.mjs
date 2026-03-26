@@ -6,7 +6,8 @@
 // Import from built output
 import { tokenGate, parseDid, parseSolanaDid, parsXrplDid, clearTokenGateCache } from './dist/index.js'
 
-const API_KEY = 'insr_live_94479912934e211026c5ba88ed928263e473f008'
+const API_KEY = process.env.INSUMER_API_KEY
+if (!API_KEY) { console.error('Set INSUMER_API_KEY env var'); process.exit(1) }
 
 // --- Test 1: DID parsing ---
 console.log('--- DID parsing ---')
