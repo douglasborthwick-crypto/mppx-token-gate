@@ -1,6 +1,6 @@
 # @insumermodel/mppx-token-gate
 
-Condition-based access for [mppx](https://github.com/wevm/mppx) routes using signed wallet attestations. One API call checks wallet conditions across 33 chains — no RPC management, no viem transports, no in-house balance checks.
+Add wallet auth to [mppx](https://github.com/wevm/mppx) routes using signed attestations. One API call checks token/NFT ownership across 30 EVM chains + Solana + XRPL + Bitcoin — no RPC management, no viem transports, no in-house balance checks.
 
 ## How it works
 
@@ -83,7 +83,7 @@ Or set `INSUMER_API_KEY` as an environment variable.
 
 ## Supported chains
 
-30 EVM chains (Ethereum, Base, Polygon, Arbitrum, Optimism, BNB, Avalanche, and 23 more) + Solana + XRPL.
+30 EVM chains (Ethereum, Base, Polygon, Arbitrum, Optimism, BNB, Avalanche, and 23 more) + Solana + XRPL + Bitcoin.
 
 [Full chain list](https://insumermodel.com/developers/api-reference/)
 
