@@ -1,7 +1,7 @@
 {
   "name": "@insumermodel/mppx-token-gate",
-  "version": "1.0.0",
-  "description": "Token-gate mppx routes using signed wallet attestations — 32 chains, no RPC management",
+  "version": "1.0.1",
+  "description": "Condition-based access for mppx routes using signed wallet attestations — 33 chains, no RPC management",
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -20,6 +20,7 @@
     "prepublishOnly": "npm run build"
   },
   "keywords": [
+    "condition-based-access",
     "mppx",
     "mpp",
     "token-gate",
