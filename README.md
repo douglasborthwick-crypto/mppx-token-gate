@@ -1,6 +1,6 @@
 # @insumermodel/mppx-token-gate
 
-Token-gate [mppx](https://github.com/wevm/mppx) routes using signed wallet attestations. One API call checks token/NFT ownership across 30 EVM chains + Solana + XRPL — no RPC management, no viem transports, no in-house balance checks.
+Condition-based access for [mppx](https://github.com/wevm/mppx) routes using signed wallet attestations. One API call checks wallet conditions across 33 chains — no RPC management, no viem transports, no in-house balance checks.
 
 ## How it works
 
