@@ -9,9 +9,9 @@ export type TokenCondition = {
   contractAddress: string
   /**
    * Chain identifier.
-   * EVM chain ID (number), "solana", or "xrpl".
+   * EVM chain ID (number), "solana", "xrpl", or "bitcoin".
    */
-  chainId: number | 'solana' | 'xrpl'
+  chainId: number | 'solana' | 'xrpl' | 'bitcoin'
   /** "token_balance" or "nft_ownership". */
   type: 'token_balance' | 'nft_ownership'
   /** Minimum balance for token_balance conditions. Defaults to 1. */
@@ -145,13 +145,23 @@ export function parsXrplDid(source: string): string | null {
   return address
 }
 
+/**
+ * Extracts a Bitcoin address from a `did:pkh:bip122:{chainId}:{address}` string.
+ */
+export function parseBitcoinDid(source: string): string | null {
+  const parts = source.split(':')
+  if (parts.length !== 5) return null
+  if (parts[0] !== 'did' || parts[1] !== 'pkh' || parts[2] !== 'bip122') return null
+  return parts[4] || null
+}
+
 // ---------------------------------------------------------------------------
 // InsumerAPI call
 // ---------------------------------------------------------------------------
 
 async function callAttest(
   wallet: string,
-  walletType: 'evm' | 'solana' | 'xrpl',
+  walletType: 'evm' | 'solana' | 'xrpl' | 'bitcoin',
   conditions: TokenCondition[],
   options: Pick<TokenGateOptions, 'apiKey' | 'apiBaseUrl' | 'jwt'>,
 ): Promise<InsumerAttestation> {
@@ -185,6 +195,7 @@ async function callAttest(
 
   if (walletType === 'solana') body.solanaWallet = wallet
   else if (walletType === 'xrpl') body.xrplWallet = wallet
+  else if (walletType === 'bitcoin') body.bitcoinWallet = wallet
   else body.wallet = wallet
 
   if (options.jwt) body.format = 'jwt'
@@ -214,7 +225,7 @@ async function callAttest(
  * Wraps an mppx `Method.Server` to grant free access to token holders.
  *
  * Extracts the payer address from `credential.source` (DID), calls InsumerAPI
- * to check token/NFT ownership across 32 chains, and returns a free receipt
+ * to check token/NFT ownership across 33 chains, and returns a free receipt
  * for holders. Non-holders fall through to the original payment method.
  *
  * The attestation is ECDSA P-256 signed and verifiable offline via JWKS.
@@ -251,7 +262,7 @@ export function tokenGate(
 
     // Determine wallet type and address
     let wallet: string | null = null
-    let walletType: 'evm' | 'solana' | 'xrpl' = 'evm'
+    let walletType: 'evm' | 'solana' | 'xrpl' | 'bitcoin' = 'evm'
 
     wallet = parseDid(source)
     if (!wallet) {
@@ -261,6 +272,10 @@ export function tokenGate(
     if (!wallet) {
       wallet = parsXrplDid(source)
       if (wallet) walletType = 'xrpl'
+    }
+    if (!wallet) {
+      wallet = parseBitcoinDid(source)
+      if (wallet) walletType = 'bitcoin'
     }
 
     // Unparseable DID → fall through to payment
