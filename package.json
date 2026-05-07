@@ -1,6 +1,6 @@
 {
   "name": "@insumermodel/mppx-condition-gate",
-  "version": "2.0.0",
+  "version": "2.0.1",
   "description": "Condition-based access for mppx routes. Wallet auth via signed attestations across 33 chains. Four condition types: token balance, NFT ownership, EAS attestation, Farcaster ID.",
   "type": "module",
   "main": "dist/index.js",
@@ -29,7 +29,6 @@
     "attestation",
     "eas",
     "farcaster",
-    "token-gate",
     "nft",
     "erc20",
     "erc721",
