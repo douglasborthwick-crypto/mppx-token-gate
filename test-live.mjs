@@ -1,10 +1,10 @@
 /**
- * Live integration test for mppx-token-gate.
+ * Live integration test for mppx-condition-gate.
  * Tests the core flow: DID parsing → InsumerAPI call → pass/fail → receipt.
  */
 
-// Import from built output
-import { tokenGate, parseDid, parseSolanaDid, parsXrplDid, clearTokenGateCache } from './dist/index.js'
+import { strict as assert } from 'node:assert'
+import { conditionGate, parseDid, parseSolanaDid, parseXrplDid, clearConditionGateCache } from './dist/index.js'
 
 const API_KEY = process.env.INSUMER_API_KEY
 if (!API_KEY) { console.error('Set INSUMER_API_KEY env var'); process.exit(1) }
@@ -14,24 +14,22 @@ console.log('--- DID parsing ---')
 
 const evm = parseDid('did:pkh:eip155:8453:0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045')
 console.log('EVM DID →', evm)
-console.assert(evm === '0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045', 'EVM parse failed')
+assert.equal(evm, '0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045', 'EVM parse failed')
 
 const sol = parseSolanaDid('did:pkh:solana:1:7xKXtg2CW87d97TXJSDpbD5jBkheTqA83TZRuJosgAsU')
 console.log('Solana DID →', sol)
-console.assert(sol === '7xKXtg2CW87d97TXJSDpbD5jBkheTqA83TZRuJosgAsU', 'Solana parse failed')
+assert.equal(sol, '7xKXtg2CW87d97TXJSDpbD5jBkheTqA83TZRuJosgAsU', 'Solana parse failed')
 
-const xrpl = parsXrplDid('did:pkh:xrpl:0:rN7n3473SaZBCG4dFL83w7p1W9cgZw6iFR')
+const xrpl = parseXrplDid('did:pkh:xrpl:0:rN7n3473SaZBCG4dFL83w7p1W9cgZw6iFR')
 console.log('XRPL DID →', xrpl)
-console.assert(xrpl === 'rN7n3473SaZBCG4dFL83w7p1W9cgZw6iFR', 'XRPL parse failed')
+assert.equal(xrpl, 'rN7n3473SaZBCG4dFL83w7p1W9cgZw6iFR', 'XRPL parse failed')
 
-const bad = parseDid('not-a-did')
-console.assert(bad === null, 'Bad DID should return null')
+assert.equal(parseDid('not-a-did'), null, 'Bad DID should return null')
 console.log('Bad DID → null ✓')
 
-// --- Test 2: Mock Method.Server + tokenGate with real API call ---
-console.log('\n--- Live attestation (Vitalik holds USDC on Base) ---')
+// --- Test 2: Mock Method.Server + conditionGate with real API call ---
+console.log('\n--- Live attestation (Vitalik holds USDC dust on Base — prove-any-balance) ---')
 
-// Minimal mock server that satisfies Method.AnyServer shape
 const mockServer = {
   name: 'tempo',
   intent: 'charge',
@@ -49,19 +47,18 @@ const mockServer = {
   },
 }
 
-const gated = tokenGate(mockServer, {
+const gated = conditionGate(mockServer, {
   apiKey: API_KEY,
   conditions: [{
     type: 'token_balance',
     contractAddress: '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913', // USDC on Base
     chainId: 8453,
-    threshold: 1,
+    threshold: 0.000001, // prove-any-balance per /v1/attest spec
     decimals: 6,
-    label: 'USDC on Base >= 1',
+    label: 'USDC on Base > 0',
   }],
 })
 
-// Simulate a credential with Vitalik's address as source DID
 const holderResult = await gated.verify({
   credential: {
     challenge: { id: 'test', intent: 'charge', method: 'tempo', realm: 'test', request: {} },
@@ -72,23 +69,23 @@ const holderResult = await gated.verify({
 })
 
 console.log('Holder receipt:', JSON.stringify(holderResult, null, 2))
-console.assert(
-  holderResult.reference.startsWith('token-gate:free:ATST-'),
-  'Expected token-gate:free receipt for holder'
+assert.ok(
+  holderResult.reference.startsWith('condition-gate:free:ATST-'),
+  `Expected condition-gate:free receipt for holder, got: ${holderResult.reference}`,
 )
 console.log('✓ Holder got free access via signed attestation')
 
-// --- Test 3: Non-holder (random address, unlikely to hold USDC) ---
-console.log('\n--- Live attestation (random address, no USDC) ---')
-clearTokenGateCache()
+// --- Test 3: Non-holder (impossibly high threshold) ---
+console.log('\n--- Live attestation (impossibly high threshold) ---')
+clearConditionGateCache()
 
-const gated2 = tokenGate(mockServer, {
+const gated2 = conditionGate(mockServer, {
   apiKey: API_KEY,
   conditions: [{
     type: 'token_balance',
     contractAddress: '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913',
     chainId: 8453,
-    threshold: 999999999, // impossibly high
+    threshold: 999999999,
     decimals: 6,
     label: 'USDC on Base >= 999999999',
   }],
@@ -104,10 +101,7 @@ const nonHolderResult = await gated2.verify({
 })
 
 console.log('Non-holder receipt:', JSON.stringify(nonHolderResult, null, 2))
-console.assert(
-  nonHolderResult.reference === 'paid:0xabc',
-  'Expected fallthrough to paid receipt for non-holder'
-)
+assert.equal(nonHolderResult.reference, 'paid:0xabc', 'Expected fallthrough to paid receipt for non-holder')
 console.log('✓ Non-holder fell through to payment')
 
 // --- Test 4: No source DID → always falls through ---
@@ -117,17 +111,15 @@ const noDidResult = await gated.verify({
   credential: {
     challenge: { id: 'test3', intent: 'charge', method: 'tempo', realm: 'test', request: {} },
     payload: {},
-    // no source
   },
   request: {},
 })
 
-console.assert(noDidResult.reference === 'paid:0xabc', 'No DID should fall through')
+assert.equal(noDidResult.reference, 'paid:0xabc', 'No DID should fall through')
 console.log('✓ No DID fell through to payment')
 
 // --- Test 5: Cache hit ---
 console.log('\n--- Cache hit (no API call) ---')
-// The first gated server already cached Vitalik's result
 const cachedResult = await gated.verify({
   credential: {
     challenge: { id: 'test4', intent: 'charge', method: 'tempo', realm: 'test', request: {} },
@@ -136,9 +128,9 @@ const cachedResult = await gated.verify({
   },
   request: {},
 })
-console.assert(
-  cachedResult.reference.startsWith('token-gate:free:ATST-'),
-  'Cached result should still be free'
+assert.ok(
+  cachedResult.reference.startsWith('condition-gate:free:ATST-'),
+  `Cached result should still be free, got: ${cachedResult.reference}`,
 )
 console.log('✓ Cache hit returned free access (no API call)')
 

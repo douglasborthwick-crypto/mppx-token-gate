@@ -1,7 +1,7 @@
 {
-  "name": "@insumermodel/mppx-token-gate",
-  "version": "1.0.3",
-  "description": "Condition-based access for mppx routes using signed wallet attestations — 33 chains, no RPC management",
+  "name": "@insumermodel/mppx-condition-gate",
+  "version": "2.0.0",
+  "description": "Condition-based access for mppx routes. Wallet auth via signed attestations across 33 chains. Four condition types: token balance, NFT ownership, EAS attestation, Farcaster ID.",
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -21,24 +21,28 @@
   },
   "keywords": [
     "condition-based-access",
+    "condition-gate",
     "mppx",
     "mpp",
-    "token-gate",
-    "token-gating",
+    "wallet-auth",
     "wallet",
     "attestation",
+    "eas",
+    "farcaster",
+    "token-gate",
+    "nft",
     "erc20",
     "erc721",
-    "nft",
     "solana",
     "xrpl",
+    "bitcoin",
     "web3"
   ],
   "author": "douglasborthwick-crypto",
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/douglasborthwick-crypto/mppx-token-gate.git"
+    "url": "git+https://github.com/douglasborthwick-crypto/mppx-condition-gate.git"
   },
   "peerDependencies": {
     "mppx": ">=0.1.0"
