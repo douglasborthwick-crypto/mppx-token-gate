@@ -114,9 +114,11 @@ Always evaluated on Optimism (chain 10). Passes if the wallet has any FID regist
 
 ## API key and credits
 
-The key itself is free to create (no credit card, no signup). Each call to `/v1/attest` consumes one or more attestation credits. New keys ship with 10 credits on the free tier, which is enough to wire up the integration end-to-end. Beyond that, credits are purchased on-chain.
+Each call to `/v1/attest` consumes one or more attestation credits. New keys ship with **10 free credits**, enough to wire up the integration end-to-end before paying anything.
 
-Create a key:
+Two ways to provision a key.
+
+**Email signup** (human-managed):
 
 ```bash
 curl -X POST https://api.insumermodel.com/v1/keys/create \
@@ -124,9 +126,11 @@ curl -X POST https://api.insumermodel.com/v1/keys/create \
   -d '{"email":"you@example.com","appName":"my-app","tier":"free"}'
 ```
 
-Or set `INSUMER_API_KEY` as an environment variable.
+**On-chain** (autonomous agent bootstrap): send USDC, USDT, or BTC to the platform wallet, then call `POST /v1/keys/buy` with the transaction hash. The transaction sender wallet is the identity, the payment is the auth — no email, no human in the loop.
 
-Top up credits on-chain via `POST /v1/credits/buy`. Accepted: USDC or USDT on any major EVM chain, USDC on Solana, or BTC on Bitcoin. See the [credits endpoint](https://insumermodel.com/developers/api-reference/) for transaction format.
+Either way, set `INSUMER_API_KEY` as an environment variable in your runtime.
+
+**Top up** an existing key on-chain via `POST /v1/credits/buy`. Accepted: USDC or USDT on any major EVM chain, USDC on Solana, or BTC on Bitcoin. See the [credits endpoint](https://insumermodel.com/developers/api-reference/) for transaction format.
 
 **Pricing model**: the wallet holder pays nothing at the gated route. The operator running the gate pays per attestation call out of the key's credit balance. Cost per attestation depends on tier and condition mix.
 
