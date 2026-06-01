@@ -1,6 +1,6 @@
 # @insumermodel/mppx-condition-gate
 
-Condition-based access for [mppx](https://github.com/wevm/mppx) routes. One signed call between request and charge gives free access to wallets that meet your conditions; everyone else falls through to the normal paid path. Four condition types: token balance, NFT ownership, EAS attestation, Farcaster ID. 33 chains. No RPC management.
+Condition-based access for [mppx](https://github.com/wevm/mppx) routes. One signed call between request and charge gives free access to wallets that meet your conditions; everyone else falls through to the normal paid path. Six condition types: token balance, NFT ownership, EAS attestation, Farcaster ID, plus ratio_to_amount (hold >= N x a spend amount) and ratio_to_supply (hold >= a fraction of token supply). No RPC management.
 
 > **Migrating from `@insumermodel/mppx-token-gate`?** This is the v2 successor. See [Migration](#migrating-from-mppx-token-gate) below.
 
@@ -49,7 +49,7 @@ Works with any framework (Hono, Express, Elysia, Next.js) and any payment method
 
 ## Condition types
 
-Mix any of the four in a single call. `matchMode: 'any'` (default) passes when any one is met; `matchMode: 'all'` requires all of them.
+Mix any of the six in a single call. `matchMode: 'any'` (default) passes when any one is met; `matchMode: 'all'` requires all of them.
 
 ### Token balance
 
@@ -111,6 +111,35 @@ Available templates: `coinbase_verified_account`, `coinbase_verified_country`, `
 ```
 
 Always evaluated on Optimism (chain 10). Passes if the wallet has any FID registered.
+
+### Ratio to amount
+
+Self-scaling spend rule: passes when the wallet holds at least `multiple` times a per-request `amount`. RPC EVM chains only.
+
+```ts
+{
+  type: 'ratio_to_amount',
+  contractAddress: 'native', // or an ERC-20 address
+  chainId: 8453,
+  multiple: 10,
+  amount: 250,
+  label: 'Holds >= 10x the 250-unit spend',
+}
+```
+
+### Ratio to supply
+
+Share-of-supply rule: passes when the wallet holds at least `minFraction` of the token's on-chain total supply. For project/governance tokens, not stablecoins. RPC EVM chains, ERC-20 contracts only.
+
+```ts
+{
+  type: 'ratio_to_supply',
+  contractAddress: '0x1f9840a85d5aF5bf1D1762F925BdADdC4201F984', // UNI
+  chainId: 1,
+  minFraction: 0.005, // 0.5% of supply
+  label: 'Holds >= 0.5% of UNI supply',
+}
+```
 
 ## API key and credits
 

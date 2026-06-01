@@ -66,17 +66,45 @@ export type FarcasterIdCondition = {
   label?: string
 }
 
+/** Self-scaling agent-spend check: met iff balance >= multiple * amount. RPC EVM chains only. */
+export type RatioToAmountCondition = {
+  type: 'ratio_to_amount'
+  /** Token contract address, or "native" for the chain's native asset. */
+  contractAddress: string
+  /** EVM chain ID (ratio conditions are RPC EVM only). */
+  chainId: number
+  /** Collateralization multiple. Met iff balance >= multiple * amount. */
+  multiple: number
+  /** Per-request reference amount in token/display units (e.g. 100 for 100 USDC, not base units). */
+  amount: number
+  label?: string
+}
+
+/** Share-of-supply check: met iff balance / totalSupply() >= minFraction. RPC EVM + ERC-20 only. */
+export type RatioToSupplyCondition = {
+  type: 'ratio_to_supply'
+  /** ERC-20 token contract address (does not accept "native"). */
+  contractAddress: string
+  /** EVM chain ID (ratio conditions are RPC EVM only). */
+  chainId: number
+  /** Required share of total supply, a fraction in (0, 1] (e.g. 0.005 for 0.5%). */
+  minFraction: number
+  label?: string
+}
+
 /** Any condition accepted by /v1/attest */
 export type Condition =
   | TokenBalanceCondition
   | NftOwnershipCondition
   | EasAttestationCondition
   | FarcasterIdCondition
+  | RatioToAmountCondition
+  | RatioToSupplyCondition
 
 export type ConditionGateOptions = {
   /** InsumerAPI key. Falls back to INSUMER_API_KEY env var. */
   apiKey?: string
-  /** One or more conditions to evaluate. Mix any of the four types. */
+  /** One or more conditions to evaluate. Mix any of the six types. */
   conditions: Condition[]
   /** Whether the wallet must satisfy "any" (default) or "all" conditions. */
   matchMode?: 'any' | 'all'
@@ -227,6 +255,27 @@ function buildBodyConditions(conditions: Condition[]): Array<Record<string, unkn
       if (c.label) cond.label = c.label
       return cond
     }
+    if (c.type === 'ratio_to_amount') {
+      const cond: Record<string, unknown> = {
+        type: c.type,
+        contractAddress: c.contractAddress,
+        chainId: c.chainId,
+        multiple: c.multiple,
+        amount: c.amount,
+      }
+      if (c.label) cond.label = c.label
+      return cond
+    }
+    if (c.type === 'ratio_to_supply') {
+      const cond: Record<string, unknown> = {
+        type: c.type,
+        contractAddress: c.contractAddress,
+        chainId: c.chainId,
+        minFraction: c.minFraction,
+      }
+      if (c.label) cond.label = c.label
+      return cond
+    }
     // token_balance or nft_ownership
     const cond: Record<string, unknown> = {
       type: c.type,
@@ -302,8 +351,10 @@ async function callAttest(
  * wallets that meet the conditions. Wallets that do not meet them fall through
  * to the original payment method.
  *
- * Supports four condition types: token_balance, nft_ownership, eas_attestation,
- * and farcaster_id. Conditions can be mixed in a single call.
+ * Supports six condition types: token_balance, nft_ownership, eas_attestation,
+ * farcaster_id, ratio_to_amount (balance >= multiple * amount), and ratio_to_supply
+ * (balance / totalSupply >= minFraction; EVM + ERC-20 only). Conditions can be mixed
+ * in a single call.
  *
  * The attestation is ECDSA P-256 signed and verifiable offline via the public
  * JWKS at https://insumermodel.com/.well-known/jwks.json.
