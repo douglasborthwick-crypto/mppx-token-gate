@@ -176,7 +176,7 @@ Either way, set `INSUMER_API_KEY` as an environment variable in your runtime.
 
 ## Supported chains
 
-30 EVM chains (Ethereum, Base, Polygon, Arbitrum, Optimism, BNB, Avalanche, and 23 more) + Solana + XRPL + Bitcoin. EAS conditions evaluate on EVM chains only. Farcaster always on Optimism.
+32 EVM chains (Ethereum, Base, Polygon, Arbitrum, Optimism, BNB, Avalanche, Robinhood Chain, and 24 more) + Solana + XRPL + Bitcoin — the 35 chains this adapter's wallet handling reaches. The engine itself covers 38 (adding Tron, Stellar, and Sui via InsumerAPI directly). EAS conditions evaluate on EVM chains only. Farcaster always on Optimism.
 
 [Full chain list](https://insumermodel.com/developers/api-reference/)
 

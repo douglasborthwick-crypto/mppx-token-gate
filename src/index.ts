@@ -347,14 +347,16 @@ async function callAttest(
  * Wraps an mppx Method.Server with condition-based access using signed attestations.
  *
  * Extracts the payer address from credential.source (DID), calls /v1/attest to
- * evaluate conditions across 33 chains, and returns a free-access receipt for
+ * evaluate conditions across the 35 chains this adapter reaches (32 EVM + Solana + XRPL + Bitcoin; the engine itself covers 38), and returns a free-access receipt for
  * wallets that meet the conditions. Wallets that do not meet them fall through
  * to the original payment method.
  *
- * Supports six condition types: token_balance, nft_ownership, eas_attestation,
- * farcaster_id, ratio_to_amount (balance >= multiple * amount), and ratio_to_supply
- * (balance / totalSupply >= minFraction; EVM + ERC-20 only). Conditions can be mixed
- * in a single call.
+ * Supports six condition types through this adapter's typed surface: token_balance,
+ * nft_ownership, eas_attestation, farcaster_id, ratio_to_amount (balance >= multiple
+ * * amount), and ratio_to_supply (balance / totalSupply >= minFraction; EVM + ERC-20
+ * only). Conditions can be mixed in a single call. InsumerAPI itself also offers
+ * evm_view_call, erc8004_agent, and erc7710_delegation; those are not yet typed or
+ * normalized here, so call /v1/attest directly if you need them.
  *
  * The attestation is ECDSA P-256 signed and verifiable offline via the public
  * JWKS at https://insumermodel.com/.well-known/jwks.json.
