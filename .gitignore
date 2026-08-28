@@ -5,3 +5,5 @@ dist/
 .npmrc
 .env
 .env.local
+legacy/*/node_modules
+legacy/*/dist

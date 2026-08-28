@@ -1,0 +1,57 @@
+{
+  "name": "@insumermodel/mppx-token-gate",
+  "version": "1.0.4",
+  "description": "DEPRECATED and no longer grants free access (GHSA-jg6q-3qfh-r9f8). Use @insumermodel/mppx-condition-gate v3+.",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "src"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "prepublishOnly": "npm run build",
+    "test": "tsc && node --test test/*.test.mjs"
+  },
+  "keywords": [
+    "condition-based-access",
+    "mppx",
+    "mpp",
+    "token-gate",
+    "token-gating",
+    "wallet",
+    "attestation",
+    "erc20",
+    "erc721",
+    "nft",
+    "solana",
+    "xrpl",
+    "web3"
+  ],
+  "author": "douglasborthwick-crypto",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/douglasborthwick-crypto/mppx-token-gate.git"
+  },
+  "peerDependencies": {
+    "mppx": ">=0.1.0"
+  },
+  "peerDependenciesMeta": {
+    "mppx": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@types/node": "^25.5.0",
+    "mppx": "latest",
+    "typescript": "^5.7.0"
+  }
+}
