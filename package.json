@@ -1,6 +1,6 @@
 {
   "name": "@insumermodel/mppx-condition-gate",
-  "version": "2.0.3",
+  "version": "3.0.0",
   "description": "Condition-based access for mppx routes. Wallet auth via signed attestations. Six condition types: token balance, NFT ownership, EAS attestation, Farcaster ID, ratio_to_amount, ratio_to_supply.",
   "type": "module",
   "main": "dist/index.js",
@@ -17,7 +17,8 @@
   ],
   "scripts": {
     "build": "tsc",
-    "prepublishOnly": "npm run build"
+    "prepublishOnly": "npm run build",
+    "test": "tsc && node --test test/*.test.mjs"
   },
   "keywords": [
     "condition-based-access",

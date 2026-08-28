@@ -101,9 +101,45 @@ export type Condition =
   | RatioToAmountCondition
   | RatioToSupplyCondition
 
+/** Wallet family for a proven payer. */
+export type WalletType = 'evm' | 'solana' | 'xrpl' | 'bitcoin'
+
+/**
+ * A payer the caller has cryptographically proven for this request.
+ *
+ * Accepts a `did:pkh:...` string, a bare `0x` EVM address, or an explicit
+ * `{ address, type }` pair. Bare non-EVM addresses are rejected because their
+ * wallet family cannot be inferred unambiguously — pass the object form.
+ */
+export type ProvenPayer =
+  | string
+  | { address: string; type: WalletType }
+  | null
+  | undefined
+
 export type ConditionGateOptions = {
   /** InsumerAPI key. Falls back to INSUMER_API_KEY env var. */
   apiKey?: string
+  /**
+   * Resolves the payer that the payment method has PROVEN controls this
+   * request. Required for free access — without it every request takes the
+   * paid path.
+   *
+   * It receives only mppx's method-specific validation `details` (for example
+   * a recovered payer address). It is deliberately NOT given the credential or
+   * the declared `source`: mppx documents `source` as "an asserted identity,
+   * not independent proof of control", and granting on it is the vulnerability
+   * fixed in 3.0.0 (GHSA-jg6q-3qfh-r9f8).
+   *
+   * Return `null` when no payer has been proven. Returning an address you have
+   * not proven reintroduces that vulnerability.
+   *
+   * @example
+   * ```ts
+   * provenPayer: (details) => (details as { payer?: string }).payer ?? null
+   * ```
+   */
+  provenPayer?: (details: unknown) => ProvenPayer | Promise<ProvenPayer>
   /** One or more conditions to evaluate. Mix any of the six types. */
   conditions: Condition[]
   /** Whether the wallet must satisfy "any" (default) or "all" conditions. */
@@ -344,19 +380,59 @@ async function callAttest(
 // ---------------------------------------------------------------------------
 
 /**
+ * Normalizes a caller-supplied proven payer into an address + wallet family.
+ *
+ * Fail-closed: anything it cannot resolve unambiguously returns null, which
+ * sends the request to the paid path.
+ */
+export function normalizeProvenPayer(
+  payer: ProvenPayer,
+): { address: string; type: WalletType } | null {
+  if (!payer) return null
+
+  if (typeof payer === 'object') {
+    const { address, type } = payer
+    if (!address || !type) return null
+    return { address, type }
+  }
+
+  if (typeof payer !== 'string') return null
+
+  const evm = parseDid(payer)
+  if (evm) return { address: evm, type: 'evm' }
+  const sol = parseSolanaDid(payer)
+  if (sol) return { address: sol, type: 'solana' }
+  const xrpl = parseXrplDid(payer)
+  if (xrpl) return { address: xrpl, type: 'xrpl' }
+  const btc = parseBitcoinDid(payer)
+  if (btc) return { address: btc, type: 'bitcoin' }
+
+  // Bare EVM address is unambiguous; anything else needs the object form.
+  if (payer.startsWith('0x')) return { address: payer, type: 'evm' }
+  return null
+}
+
+/**
  * Wraps an mppx Method.Server with condition-based access using signed attestations.
  *
- * Extracts the payer address from credential.source (DID), calls /v1/attest to
- * evaluate conditions across the 35 chains this adapter reaches (32 EVM + Solana + XRPL + Bitcoin; the engine itself covers 38), and returns a free-access receipt for
- * wallets that meet the conditions. Wallets that do not meet them fall through
- * to the original payment method.
+ * Free access requires a PROVEN payer. The gate calls the method's non-mutating
+ * `validate` hook, hands the resulting method-specific `details` to your
+ * `provenPayer` resolver, and only then evaluates conditions. It never reads
+ * `credential.source` — mppx documents that field as an asserted identity
+ * rather than proof of control.
  *
- * Supports six condition types through this adapter's typed surface: token_balance,
- * nft_ownership, eas_attestation, farcaster_id, ratio_to_amount (balance >= multiple
- * * amount), and ratio_to_supply (balance / totalSupply >= minFraction; EVM + ERC-20
- * only). Conditions can be mixed in a single call. InsumerAPI itself also offers
- * evm_view_call, erc8004_agent, and erc7710_delegation; those are not yet typed or
- * normalized here, so call /v1/attest directly if you need them.
+ * The gate falls through to the paid path whenever free access cannot be
+ * justified: no `provenPayer` resolver, no `validate` hook on the method
+ * (legacy `verify`-only methods included), a resolver returning null, a
+ * credential that fails validation, conditions not met, or an attestation
+ * error. There is no path from an unproven wallet to a free receipt.
+ *
+ * Conditions are evaluated across the 35 chains this adapter reaches (32 EVM +
+ * Solana + XRPL + Bitcoin; the engine itself covers 38). Six condition types
+ * are typed here: token_balance, nft_ownership, eas_attestation, farcaster_id,
+ * ratio_to_amount, and ratio_to_supply. InsumerAPI also offers evm_view_call,
+ * erc8004_agent, and erc7710_delegation; those are not typed or normalized
+ * here, so call /v1/attest directly if you need them.
  *
  * The attestation is ECDSA P-256 signed and verifiable offline via the public
  * JWKS at https://insumermodel.com/.well-known/jwks.json.
@@ -366,6 +442,8 @@ async function callAttest(
  * import { conditionGate } from '@insumermodel/mppx-condition-gate'
  *
  * const gated = conditionGate(tempoCharge, {
+ *   // Return only a payer this method has proven for THIS request.
+ *   provenPayer: (details) => (details as { payer?: string }).payer ?? null,
  *   conditions: [
  *     { type: 'eas_attestation', template: 'coinbase_verified_account', chainId: 8453 },
  *     { type: 'farcaster_id' },
@@ -380,92 +458,97 @@ export function conditionGate(
   server: Method.AnyServer,
   options: ConditionGateOptions,
 ): Method.AnyServer {
-  const { conditions, matchMode = 'any', cacheTtlSeconds = 300 } = options
+  const { conditions, matchMode = 'any', cacheTtlSeconds = 300, provenPayer } = options
 
-  const originalVerify = server.verify
+  const anyServer = server as unknown as {
+    verify: (params: any) => Promise<any>
+    broadcast?: (params: any) => Promise<any>
+    validate?: (params: any) => Promise<any>
+  }
 
-  const gatedVerify: typeof originalVerify = async (params: any) => {
-    const credential = params.credential as { source?: string }
-    const source = credential.source
+  const originalVerify = anyServer.verify
+  const originalBroadcast = anyServer.broadcast
+  const originalValidate = anyServer.validate
 
-    // No DID → fall through to payment
-    if (!source) return originalVerify(params)
+  // Free access is only reachable when BOTH exist: a resolver to supply the
+  // proven payer, and a non-mutating validate hook to derive it from. A method
+  // without `validate` (legacy verify-only, or broadcast-without-validate) has
+  // no safe pre-check, so it is never gated.
+  const canGate =
+    typeof provenPayer === 'function' && typeof originalValidate === 'function'
 
-    // Determine wallet type and address
-    let wallet: string | null = null
-    let walletType: 'evm' | 'solana' | 'xrpl' | 'bitcoin' = 'evm'
+  /** Returns a free receipt, or null to take the paid path. */
+  async function tryFree(params: any): Promise<any | null> {
+    if (!canGate) return null
 
-    wallet = parseDid(source)
-    if (!wallet) {
-      wallet = parseSolanaDid(source)
-      if (wallet) walletType = 'solana'
+    let details: unknown
+    try {
+      const validation = await originalValidate!(params)
+      details = (validation as { details?: unknown } | undefined)?.details
+    } catch {
+      // Credential is not currently acceptable → let the payment method decide.
+      return null
     }
-    if (!wallet) {
-      wallet = parseXrplDid(source)
-      if (wallet) walletType = 'xrpl'
-    }
-    if (!wallet) {
-      wallet = parseBitcoinDid(source)
-      if (wallet) walletType = 'bitcoin'
+
+    let resolved: ProvenPayer
+    try {
+      resolved = await provenPayer!(details)
+    } catch {
+      return null
     }
 
-    // Unparseable DID → fall through to payment
-    if (!wallet) return originalVerify(params)
+    const payer = normalizeProvenPayer(resolved)
+    if (!payer) return null
 
-    // Check cache
-    const key = cacheKey(wallet, conditions)
+    const key = cacheKey(payer.address, conditions)
     const cached = cache.get(key)
     if (cached && cached.expiresAt > Date.now()) {
-      if (cached.pass) {
-        return {
-          method: server.name,
-          reference: `condition-gate:free:${cached.attestationId}`,
-          status: 'success' as const,
-          timestamp: new Date().toISOString(),
-        }
+      if (!cached.pass) return null
+      return {
+        method: server.name,
+        reference: `condition-gate:free:${cached.attestationId}`,
+        status: 'success' as const,
+        timestamp: new Date().toISOString(),
       }
-      // Cached non-holder → fall through
-      return originalVerify(params)
     }
 
-    // Call InsumerAPI
     try {
-      const result = await callAttest(wallet, walletType, conditions, options)
+      const result = await callAttest(payer.address, payer.type, conditions, options)
       const attestation = result.data.attestation
 
-      // Determine pass based on matchMode
-      let pass: boolean
-      if (matchMode === 'all') {
-        pass = attestation.pass // all conditions must be met
-      } else {
-        // "any" — at least one condition met
-        pass = attestation.results.some((r) => r.met)
-      }
+      const pass =
+        matchMode === 'all'
+          ? attestation.pass
+          : attestation.results.some((r) => r.met)
 
-      // Cache the result
       cache.set(key, {
         pass,
         attestationId: attestation.id,
         expiresAt: Date.now() + cacheTtlSeconds * 1000,
       })
 
-      if (pass) {
-        return {
-          method: server.name,
-          reference: `condition-gate:free:${attestation.id}`,
-          status: 'success' as const,
-          timestamp: new Date().toISOString(),
-        }
+      if (!pass) return null
+      return {
+        method: server.name,
+        reference: `condition-gate:free:${attestation.id}`,
+        status: 'success' as const,
+        timestamp: new Date().toISOString(),
       }
     } catch {
-      // Attestation API error → fall through to payment (fail open)
+      // Attestation error → paid path.
+      return null
     }
-
-    return originalVerify(params)
   }
 
-  return {
-    ...server,
-    verify: gatedVerify,
+  const wrapped = { ...server } as unknown as Record<string, unknown>
+
+  if (typeof originalBroadcast === 'function') {
+    wrapped.broadcast = async (params: any) =>
+      (await tryFree(params)) ?? originalBroadcast(params)
   }
+
+  wrapped.verify = async (params: any) =>
+    (await tryFree(params)) ?? originalVerify(params)
+
+  return wrapped as unknown as Method.AnyServer
 }

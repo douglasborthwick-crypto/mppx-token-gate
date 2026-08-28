@@ -6,15 +6,22 @@ Condition-based access for [mppx](https://github.com/wevm/mppx) routes. One sign
 
 ## How it works
 
-mppx embeds the payer's identity in every payment credential as a DID string (`credential.source: "did:pkh:eip155:8453:0xABC..."`). `conditionGate` reads that address, calls [InsumerAPI](https://insumermodel.com) to evaluate the configured conditions, and short-circuits the payment flow for wallets that pass.
+Free access requires a payer your payment method has **proven** controls the request. You supply that payer through `provenPayer`; the gate never infers one.
 
 1. Request arrives with a payment credential
-2. `conditionGate` extracts the payer address from `credential.source`
-3. [InsumerAPI](https://insumermodel.com/developers/api-reference/) evaluates the conditions and returns an ECDSA P-256 signed attestation
-4. **Pass** → free receipt returned (`reference: "condition-gate:free:{attestationId}"`)
-5. **Fail** → delegates to the original `verify` (normal payment proceeds)
+2. The gate calls the method's non-mutating `validate` hook
+3. Your `provenPayer` resolver receives mppx's method-specific validation `details` and returns the proven payer, or `null`
+4. [InsumerAPI](https://insumermodel.com/developers/api-reference/) evaluates the conditions for that payer and returns an ECDSA P-256 signed attestation
+5. **Pass** → free receipt returned (`reference: "condition-gate:free:{attestationId}"`)
+6. **Fail, or no proven payer** → the normal paid path runs
 
 The signed attestation is verifiable offline via [JWKS](https://insumermodel.com/.well-known/jwks.json). The adapter does not re-sign or wrap the result; the signature on the attestation is the one InsumerAPI produced.
+
+### Why you must supply the payer
+
+mppx credentials carry an optional `source` DID, but mppx documents it as *"an asserted identity, not independent proof of control"* — it is a claim by the caller, not a proof. Versions before 3.0.0 granted free access on it, which let anyone name a qualifying wallet and skip payment ([GHSA-jg6q-3qfh-r9f8](https://github.com/douglasborthwick-crypto/mppx-condition-gate/security/advisories/GHSA-jg6q-3qfh-r9f8)). The gate now refuses to guess.
+
+`provenPayer` receives **only** the validation `details` — never the credential and never `source` — so the unproven identity is not reachable from it. Return a payer only if the payment method has actually established control of it. **Every path that cannot justify free access falls through to payment:** no resolver, no `validate` hook on the method, a resolver returning `null` or throwing, a credential that fails validation, conditions not met, or an attestation error.
 
 ## Install
 
@@ -35,6 +42,9 @@ const tempoCharge = tempo({
 
 const gatedCharge = conditionGate(tempoCharge, {
   apiKey: process.env.INSUMER_API_KEY,
+  // Return only a payer this method has PROVEN for this request, else null.
+  // The argument is mppx's method-specific validation `details`.
+  provenPayer: (details) => (details as { payer?: string }).payer ?? null,
   conditions: [{
     type: 'nft_ownership',
     contractAddress: '0xYourNFT',
@@ -221,6 +231,24 @@ If the attestation API is unreachable, the adapter falls through to the original
 The condition shapes for `token_balance` and `nft_ownership` are unchanged. `eas_attestation` and `farcaster_id` are new in v2.
 
 The `parsXrplDid` typo from v1 is fixed: use `parseXrplDid`. The cache helper renamed: `clearTokenGateCache` is now `clearConditionGateCache`.
+
+## Migrating from 2.x (security release)
+
+3.0.0 fixes an authentication bypass ([GHSA-jg6q-3qfh-r9f8](https://github.com/douglasborthwick-crypto/mppx-condition-gate/security/advisories/GHSA-jg6q-3qfh-r9f8)). All 2.x versions, and all versions of the predecessor `@insumermodel/mppx-token-gate`, are affected.
+
+Add a `provenPayer` resolver:
+
+```diff
+  const gated = conditionGate(server, {
+    apiKey: process.env.INSUMER_API_KEY,
++   provenPayer: (details) => (details as { payer?: string }).payer ?? null,
+    conditions: [ ... ],
+  })
+```
+
+Without it the gate compiles and runs, but never grants free access — every request takes the paid path. That is deliberate: the insecure default is gone, and the safe default is to charge.
+
+Your method must expose mppx's `validate` hook. Legacy `verify`-only methods have no non-mutating pre-check, so they are never gated.
 
 ## License
 
