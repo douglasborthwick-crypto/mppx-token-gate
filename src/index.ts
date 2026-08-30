@@ -12,8 +12,10 @@ export type TokenBalanceCondition = {
   /** Token contract address. For XRPL native XRP or Bitcoin, use "native". */
   contractAddress: string
   chainId: ChainId
-  /** Minimum balance. Defaults to 1. */
-  threshold?: number
+  /** Minimum balance in token units. Pass a decimal string (e.g. "1000") for
+   *  full precision; keys minted today sign under the v2 scheme and reject a
+   *  JSON number, so numbers are converted to strings before sending. Defaults to "1". */
+  threshold?: number | string
   /** Token decimals. Auto-detected on most EVM chains if omitted. */
   decimals?: number
   /** XRPL currency code (e.g. "USD", "RLUSD") for trust-line tokens. */
@@ -319,7 +321,8 @@ function buildBodyConditions(conditions: Condition[]): Array<Record<string, unkn
       chainId: c.chainId,
     }
     if (c.type === 'token_balance') {
-      cond.threshold = c.threshold ?? 1
+      const threshold = c.threshold ?? '1'
+      cond.threshold = typeof threshold === 'string' ? threshold : String(threshold)
       if (c.decimals !== undefined) cond.decimals = c.decimals
       if (c.currency) cond.currency = c.currency
     }

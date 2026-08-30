@@ -68,7 +68,7 @@ Mix any of the six in a single call. `matchMode: 'any'` (default) passes when an
   type: 'token_balance',
   contractAddress: '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48', // USDC
   chainId: 1,
-  threshold: 1000,
+  threshold: '1000', // decimal string in token units; numbers are converted before sending
   decimals: 6,
   label: 'USDC >= 1000',
 }
