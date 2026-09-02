@@ -15,7 +15,7 @@ Free access requires a payer your payment method has **proven** controls the req
 5. **Pass** → free receipt returned (`reference: "condition-gate:free:{attestationId}"`)
 6. **Fail, or no proven payer** → the normal paid path runs
 
-The signed attestation is verifiable offline via [JWKS](https://insumermodel.com/.well-known/jwks.json). The adapter does not re-sign or wrap the result; the signature on the attestation is the one InsumerAPI produced.
+The signed attestation is verifiable offline via [JWKS](https://insumermodel.com/.well-known/jwks.json). The adapter does not re-sign or wrap the result; the signature on the attestation is the one InsumerAPI produced. Since 2026-09-01 every attest response also carries an ML-DSA-65 post-quantum companion (`pqSig`, `pqKid`) beside `sig` and `kid`, added without changing them; the `InsumerAttestation` type declares `pqSig` and `pqKid` beside `sig` and `kid`, and `insumer-verify` 1.8.1+ reports the companion as a fifth verdict.
 
 ### Why you must supply the payer
 
@@ -181,7 +181,6 @@ Either way, set `INSUMER_API_KEY` as an environment variable in your runtime.
 | `conditions` | `Condition[]` | required | One or more conditions to evaluate |
 | `matchMode` | `'any' \| 'all'` | `'any'` | Wallet must satisfy any or all conditions |
 | `cacheTtlSeconds` | `number` | `300` | In-memory cache TTL |
-| `jwt` | `boolean` | `false` | Request ES256 JWT alongside raw attestation |
 | `apiBaseUrl` | `string` | `https://api.insumermodel.com` | API base URL override |
 
 ## Supported chains
@@ -196,7 +195,10 @@ Either way, set `INSUMER_API_KEY` as an environment variable in your runtime.
 const receipt = Receipt.fromResponse(response)
 if (receipt.reference.startsWith('condition-gate:free:')) {
   const attestationId = receipt.reference.replace('condition-gate:free:', '')
-  // Free access. Attestation ID is retrievable via /v1/attestations/{id}
+  // Free access. attestationId is the `id` of the signed attestation InsumerAPI
+  // returned for this payer (from POST /v1/attest). The gate keeps only `id` and
+  // `pass` in its in-memory cache and the API has no lookup by id, so record the
+  // reference here if you need to correlate it with your own logs.
 } else {
   // Paid access
 }

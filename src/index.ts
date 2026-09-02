@@ -153,7 +153,12 @@ export type ConditionGateOptions = {
    * Override for self-hosted deployments or testing.
    */
   apiBaseUrl?: string
-  /** Request JWT format alongside the raw attestation. Defaults to false. */
+  /**
+   * @deprecated No effect. The gate consumes the attestation internally and
+   * returns only an mppx receipt, so a requested JWT never reached the caller.
+   * Accepted for type compatibility; not sent to the API. Call POST /v1/attest
+   * with `format: "jwt"` directly if you need the `jwt` and `pqJwt` tokens.
+   */
   jwt?: boolean
 }
 
@@ -183,7 +188,12 @@ export type InsumerAttestation = {
     }
     sig: string
     kid: string
+    /** ML-DSA-65 post-quantum companion signature (since 2026-09-01, additive). */
+    pqSig?: string
+    /** Post-quantum key id, insumer-attest-pq1 (resolved in the JWKS as an RFC 9964 AKP entry). */
+    pqKid?: string
     jwt?: string
+    pqJwt?: string
   }
   meta: {
     version: string
@@ -338,7 +348,7 @@ async function callAttest(
   wallet: string,
   walletType: 'evm' | 'solana' | 'xrpl' | 'bitcoin',
   conditions: Condition[],
-  options: Pick<ConditionGateOptions, 'apiKey' | 'apiBaseUrl' | 'jwt'>,
+  options: Pick<ConditionGateOptions, 'apiKey' | 'apiBaseUrl'>,
 ): Promise<InsumerAttestation> {
   const apiKey = options.apiKey || process.env.INSUMER_API_KEY
   if (!apiKey) {
@@ -358,8 +368,6 @@ async function callAttest(
   else if (walletType === 'xrpl') body.xrplWallet = wallet
   else if (walletType === 'bitcoin') body.bitcoinWallet = wallet
   else body.wallet = wallet
-
-  if (options.jwt) body.format = 'jwt'
 
   const response = await fetch(`${baseUrl}/v1/attest`, {
     method: 'POST',
